@@ -9,13 +9,16 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.4.4</version>
+        <!-- UPGRADED: 3.5.14 → 4.0.6 (latest stable)
+             Built on Spring Framework 7, Jakarta EE 11, Jackson 3, Hibernate 7.2
+             CODE CHANGES REQUIRED — see migration notes -->
+        <version>4.0.6</version>
         <relativePath/>
     </parent>
 
     <groupId>io.github.gracemansam</groupId>
     <artifactId>lamiplus_common_api</artifactId>
-    <version>1.9.25</version>
+    <version>2.0.1</version>
     <name>lamiplus_common_api</name>
     <description>lamiplus_common_api</description>
     <url>https://github.com/Data-Fi-Nigeria-LAMISPlus/pabkvsicxa</url>
@@ -40,9 +43,6 @@
         <url>https://github.com/Data-Fi-Nigeria-LAMISPlus/pabkvsicxa/tree/main</url>
     </scm>
 
-    <!-- ========================= -->
-    <!-- Properties -->
-    <!-- ========================= -->
     <properties>
         <java.version>21</java.version>
         <maven.compiler.source>21</maven.compiler.source>
@@ -50,9 +50,9 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
-    <!-- ========================= -->
-    <!-- Dependencies -->
-    <!-- ========================= -->
+    <!-- No dependencyManagement overrides needed — Boot 4.0.6 BOM
+         manages Jackson 3, Hibernate 7.2, Jakarta EE 11 natively -->
+
     <dependencies>
 
         <dependency>
@@ -60,10 +60,10 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+        <!-- Boot 4.0.6 manages Jakarta Persistence 3.2 (Jakarta EE 11) -->
         <dependency>
             <groupId>jakarta.persistence</groupId>
             <artifactId>jakarta.persistence-api</artifactId>
-            <version>3.1.0</version>
         </dependency>
 
         <dependency>
@@ -71,6 +71,8 @@
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
 
+        <!-- Boot 4.0.6 manages Hibernate 7.2.x
+             CODE CHANGE: hibernate-jpamodelgen → hibernate-processor (if used) -->
         <dependency>
             <groupId>org.hibernate.orm</groupId>
             <artifactId>hibernate-core</artifactId>
@@ -95,7 +97,6 @@
 
     </dependencies>
 
-
     <distributionManagement>
         <repository>
             <id>github</id>
@@ -103,13 +104,9 @@
         </repository>
     </distributionManagement>
 
-    <!-- ========================= -->
-    <!-- Build & Plugins -->
-    <!-- ========================= -->
     <build>
         <plugins>
 
-            <!-- Compiler -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -127,21 +124,10 @@
                 </configuration>
             </plugin>
 
-            <!-- Maven Central Publishing -->
-<!--            <plugin>-->
-<!--                <groupId>org.sonatype.central</groupId>-->
-<!--                <artifactId>central-publishing-maven-plugin</artifactId>-->
-<!--                <version>0.5.0</version>-->
-<!--                <extensions>true</extensions>-->
-<!--                <configuration>-->
-<!--                    <publishingServerId>central</publishingServerId>-->
-<!--                </configuration>-->
-<!--            </plugin>-->
-            <!-- Javadoc -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
-                <version>3.6.3</version>
+                <version>3.12.0</version>
                 <executions>
                     <execution>
                         <id>attach-javadocs</id>
@@ -157,11 +143,10 @@
                 </configuration>
             </plugin>
 
-            <!-- Sources -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
-                <version>3.2.1</version>
+                <version>3.3.1</version>
                 <executions>
                     <execution>
                         <id>attach-sources</id>
@@ -172,21 +157,19 @@
                 </executions>
             </plugin>
 
-            <!-- GPG Signing -->
-<!--            <plugin>-->
-<!--                <groupId>org.apache.maven.plugins</groupId>-->
-<!--                <artifactId>maven-gpg-plugin</artifactId>-->
-<!--                <version>1.6</version>-->
-<!--                <executions>-->
-<!--                    <execution>-->
-<!--                        <id>sign-artifacts</id>-->
-<!--                        <phase>verify</phase>-->
-<!--                        <goals>-->
-<!--                            <goal>sign</goal>-->
-<!--                        </goals>-->
-<!--                    </execution>-->
-<!--                </executions>-->
-<!--            </plugin>-->
+            <plugin>
+                <groupId>org.cyclonedx</groupId>
+                <artifactId>cyclonedx-maven-plugin</artifactId>
+                <version>2.9.1</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>makeBom</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
 
         </plugins>
     </build>

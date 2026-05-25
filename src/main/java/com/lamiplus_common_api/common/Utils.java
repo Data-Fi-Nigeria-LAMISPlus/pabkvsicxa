@@ -3,9 +3,13 @@ package com.lamiplus_common_api.common;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.UUID;
+
 @Component
 @Slf4j
 public class Utils {
+
+
 
     public static String getTenantIdFromContext() {
         log.debug("getTenantIdFromContext() called");
@@ -25,15 +29,87 @@ public class Utils {
             log.debug("Could not access core TenantContext: {}", e.getMessage());
         }
 
-        log.debug("Checking DevTenantContext.isSet(): {}", DevTenantContext.isSet());
         if (DevTenantContext.isSet()) {
             String tenantId = DevTenantContext.getTenantId();
             log.debug("Tenant ID from dev context: {}", tenantId);
             return tenantId;
         }
 
-        log.error("No tenant ID available - DevTenantContext.isSet() = {}", DevTenantContext.isSet());
+        log.error("No tenant ID available");
         throw new RuntimeException("Failed to get tenant ID from context");
+    }
+
+
+
+
+    public static UUID getFacilityIdFromContext() {
+        log.debug("getFacilityIdFromContext() called");
+
+        try {
+            Class<?> tenantContextClass = Class.forName("coreapplication.service.plugin_manager.TenantContext");
+            java.lang.reflect.Method method = tenantContextClass.getMethod("getFacilityIdOrNull");
+            UUID facilityId = (UUID) method.invoke(null);
+
+            if (facilityId != null) {
+                log.debug("Facility ID from core context: {}", facilityId);
+                return facilityId;
+            }
+        } catch (ClassNotFoundException e) {
+            log.debug("Core TenantContext not available");
+        } catch (Exception e) {
+            log.debug("Could not access core TenantContext for facility: {}", e.getMessage());
+        }
+
+        log.debug("No facility ID in context");
+        return null;
+    }
+
+    // ============================================================
+    // ADMIN ROLE CHECKS (reflection into core SecurityUtils)
+    // ============================================================
+
+    public static boolean isCurrentUserSuperAdmin() {
+        return invokeSecurityUtilsBoolean("isCurrentUserSuperAdmin");
+    }
+
+    public static boolean isCurrentUserTenantAdmin() {
+        return invokeSecurityUtilsBoolean("isCurrentUserTenantAdmin");
+    }
+
+    public static boolean isCurrentUserFacilityAdmin() {
+        return invokeSecurityUtilsBoolean("isCurrentUserFacilityAdmin");
+    }
+
+
+    public static boolean hasCrossFacilityAccess() {
+        return isCurrentUserSuperAdmin() || isCurrentUserTenantAdmin();
+    }
+
+    private static boolean invokeSecurityUtilsBoolean(String methodName) {
+        try {
+            Class<?> clazz = Class.forName("coreapplication.security.SecurityUtils");
+            java.lang.reflect.Method method = clazz.getMethod(methodName);
+            return (boolean) method.invoke(null);
+        } catch (ClassNotFoundException e) {
+            log.debug("Core SecurityUtils not available - assuming false for {}", methodName);
+            return false;
+        } catch (Exception e) {
+            log.debug("Could not invoke SecurityUtils.{}: {}", methodName, e.getMessage());
+            return false;
+        }
+    }
+
+
+    public static String resolveFacilityScope() {
+        if (hasCrossFacilityAccess()) {
+            return null;
+        }
+        UUID facilityId = getFacilityIdFromContext();
+        if (facilityId == null) {
+            throw new IllegalStateException(
+                    "No facility context for non-admin user. Select a facility before proceeding.");
+        }
+        return facilityId.toString();
     }
 
     public static UserInfo getCurrentUser() {
@@ -41,47 +117,29 @@ public class Utils {
 
         try {
             Class<?> securityContextHolderClass = Class.forName(
-                    "org.springframework.security.core.context.SecurityContextHolder"
-            );
+                    "org.springframework.security.core.context.SecurityContextHolder");
             java.lang.reflect.Method getContext = securityContextHolderClass.getMethod("getContext");
             Object securityContext = getContext.invoke(null);
 
-            java.lang.reflect.Method getAuthentication = securityContext.getClass()
-                    .getMethod("getAuthentication");
+            java.lang.reflect.Method getAuthentication = securityContext.getClass().getMethod("getAuthentication");
             Object authentication = getAuthentication.invoke(securityContext);
 
-            if (authentication == null) {
-                log.debug("No authentication found in SecurityContext");
-                return null;
-            }
+            if (authentication == null) return null;
 
-            java.lang.reflect.Method isAuthenticated = authentication.getClass()
-                    .getMethod("isAuthenticated");
+            java.lang.reflect.Method isAuthenticated = authentication.getClass().getMethod("isAuthenticated");
             boolean authenticated = (boolean) isAuthenticated.invoke(authentication);
+            if (!authenticated) return null;
 
-            if (!authenticated) {
-                log.debug("User is not authenticated");
-                return null;
-            }
-
-            java.lang.reflect.Method getPrincipal = authentication.getClass()
-                    .getMethod("getPrincipal");
+            java.lang.reflect.Method getPrincipal = authentication.getClass().getMethod("getPrincipal");
             Object principal = getPrincipal.invoke(authentication);
 
-            if (principal == null || "anonymousUser".equals(principal)) {
-                log.debug("Principal is anonymous or null");
-                return null;
-            }
+            if (principal == null || "anonymousUser".equals(principal)) return null;
 
             try {
-                Class<?> customUserDetailsClass = Class.forName(
-                        "coreapplication.security.CustomUserDetails"
-                );
-
+                Class<?> customUserDetailsClass = Class.forName("coreapplication.security.CustomUserDetails");
                 if (customUserDetailsClass.isInstance(principal)) {
                     java.lang.reflect.Method getUser = customUserDetailsClass.getMethod("getUser");
                     Object user = getUser.invoke(principal);
-
                     Class<?> userClass = user.getClass();
 
                     String email = (String) userClass.getMethod("getEmail").invoke(user);
@@ -89,26 +147,22 @@ public class Utils {
                     String userId = (String) userClass.getMethod("getId").invoke(user);
                     String tenantId = (String) userClass.getMethod("getTenantId").invoke(user);
 
-                    log.debug("Current user from CustomUserDetails: {} (tenant: {})", email, tenantId);
-
                     return new UserInfo(userId, email, fullName, tenantId);
                 }
             } catch (ClassNotFoundException e) {
-                log.debug("CustomUserDetails not available - running in standalone mode");
+                log.debug("CustomUserDetails not available");
             }
 
             if (principal instanceof String username) {
-                log.debug("Current user from String principal: {}", username);
                 return new UserInfo(null, username, username, getTenantIdSafe());
             }
 
             java.lang.reflect.Method getName = authentication.getClass().getMethod("getName");
             String name = (String) getName.invoke(authentication);
-            log.debug("Current user from authentication.getName(): {}", name);
             return new UserInfo(null, name, name, getTenantIdSafe());
 
         } catch (Exception e) {
-            log.error("Could not get current user from SecurityContext: {}", e.getMessage(), e);
+            log.error("Could not get current user: {}", e.getMessage(), e);
             return null;
         }
     }

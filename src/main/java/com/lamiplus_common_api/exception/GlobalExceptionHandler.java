@@ -201,9 +201,19 @@ public class GlobalExceptionHandler {
         String userMessage;
         Throwable cause = ex.getCause();
 
-        if (cause instanceof com.fasterxml.jackson.databind.exc.InvalidFormatException ife) {
+        // ====================================================================
+        // JACKSON 3 MIGRATION (Spring Boot 4.0.6):
+        //   com.fasterxml.jackson.databind.exc.InvalidFormatException
+        //     → tools.jackson.databind.exc.InvalidFormatException
+        //   com.fasterxml.jackson.core.JsonParseException
+        //     → tools.jackson.core.exc.StreamReadException
+        // ====================================================================
+
+        if (cause instanceof tools.jackson.databind.exc.InvalidFormatException ife) {
+            // Jackson 3: JsonMappingException.Reference → DatabindException.Reference
+            //            getFieldName() → getPropertyName()
             String fieldName = ife.getPath().isEmpty() ? "unknown field" :
-                    ife.getPath().get(ife.getPath().size() - 1).getFieldName();
+                    ife.getPath().get(ife.getPath().size() - 1).getPropertyName();
             String badValue = String.valueOf(ife.getValue());
 
             if (ife.getTargetType() != null && ife.getTargetType().isEnum()) {
@@ -217,7 +227,7 @@ public class GlobalExceptionHandler {
             } else {
                 userMessage = String.format("Invalid value '%s' for field '%s'", badValue, fieldName);
             }
-        } else if (cause instanceof com.fasterxml.jackson.core.JsonParseException) {
+        } else if (cause instanceof tools.jackson.core.exc.StreamReadException) {
             userMessage = "Request body contains malformed JSON";
         } else {
             userMessage = "Request body is missing or unreadable";

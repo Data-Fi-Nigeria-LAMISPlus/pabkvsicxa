@@ -1,22 +1,16 @@
 package com.lamiplus_common_api.common;
 
-
+import com.lamiplus_common_api.common.Utils;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import jakarta.persistence.Id;
+import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.ColumnDefault;
-import org.springframework.data.annotation.CreatedBy;
-import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedBy;
-import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.annotation.*;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
-
 
 @Getter
 @Setter
@@ -27,7 +21,6 @@ import java.util.UUID;
 @EntityListeners(AuditingEntityListener.class)
 public class BaseAudit {
 
-    /** Primary key (auto-generated). */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -53,15 +46,21 @@ public class BaseAudit {
 
     @Column(name = "archived")
     @ColumnDefault("0")
-    private Integer archived=0;
+    private Integer archived = 0;
 
     @Column(name = "tenant_id", length = 50)
     private String tenantId;
+
+    @Column(name = "facility_id")
+    private UUID facilityId;
 
     @PrePersist
     public void prePersist() {
         if (this.tenantId == null) {
             this.tenantId = Utils.getTenantIdFromContext();
+        }
+        if (this.facilityId == null) {
+            this.facilityId = Utils.getFacilityIdFromContext();
         }
         if (this.uuid == null) {
             this.uuid = UUID.randomUUID();
@@ -70,5 +69,4 @@ public class BaseAudit {
             this.archived = 0;
         }
     }
-
 }

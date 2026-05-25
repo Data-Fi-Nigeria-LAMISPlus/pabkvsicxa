@@ -1,84 +1,140 @@
 package com.lamiplus_common_api.api;
 
-
-
 import java.util.*;
 
 /**
- * Generic CRUD interface for cross-plugin data access.
- * All plugins implement this for their entities.
- * Uses Map<String, Object> for classloader compatibility.
+ * Contract that each plugin's SERVICE registers with the common-api registry.
+ *
+ * KEY DESIGN RULE:
+ *   The implementing class MUST be the plugin's actual service (or a thin adapter
+ *   that delegates to it), NOT a raw repository wrapper. This ensures every
+ *   cross-plugin call goes through validation, business rules, audit logging, etc.
+ *
+ * TWO WAYS TO CALL:
+ *
+ *   1. GENERIC CRUD — save(), update(), findByUuid(), etc.
+ *      These are standard operations every entity supports.
+ *
+ *   2. NAMED METHOD CALLS — executeMethod("saveEncounter", params)
+ *      This lets the caller invoke a SPECIFIC method on the target service
+ *      by name, passing the exact parameters that method expects.
+ *      The target plugin maps method names to actual service methods.
+ *
+ *      Example:
+ *        Admission plugin calls:
+ *          pluginBridge.service("Encounter")
+ *              .call("saveEncounter", encounterDto)
+ *
+ *        Encounter plugin routes it to:
+ *          encounterService.saveEncounter(data)
  */
 public interface PluginDataService {
 
-    /**
-     * Get the entity name this service handles (e.g., "Diagnosis", "Admission")
-     */
+    /** The entity/service name this service manages (e.g., "Encounter", "Diagnosis") */
     String getEntityName();
 
-    // ============ READ OPERATIONS ============
+    // ================================================================
+    //  NAMED METHOD CALLS — the primary cross-plugin communication API
+    // ================================================================
 
     /**
-     * Find entity by UUID
+     * Execute a named service method with parameters.
+     *
+     * The implementing plugin maps methodName to its actual service method.
+     * This is the MAIN way plugins call each other's service methods.
+     *
+     * @param methodName the service method to invoke
+     * @param params     method parameters (serialized from caller's DTO)
+     * @return result as Map<String, Object>
      */
-    Optional<Map<String, Object>> findByUuid(UUID uuid);
+    default Map<String, Object> executeMethod(String methodName, Map<String, Object> params) {
+        throw new UnsupportedOperationException(
+                getEntityName() + " does not expose method: " + methodName);
+    }
 
     /**
-     * Find multiple entities by UUIDs
+     * Execute a named method that returns a list.
      */
-    List<Map<String, Object>> findByUuids(List<UUID> uuids);
+    default List<Map<String, Object>> executeListMethod(String methodName, Map<String, Object> params) {
+        throw new UnsupportedOperationException(
+                getEntityName() + " does not expose list method: " + methodName);
+    }
 
     /**
-     * Find all entities by patient UUID
+     * Execute a named method that returns a boolean.
      */
-    List<Map<String, Object>> findByPatientUuid(UUID patientUuid);
+    default boolean executeBooleanMethod(String methodName, Map<String, Object> params) {
+        throw new UnsupportedOperationException(
+                getEntityName() + " does not expose boolean method: " + methodName);
+    }
 
     /**
-     * Find all entities by tenant ID
+     * Returns the list of method names this service exposes.
+     * Useful for debugging and discovery.
      */
-    List<Map<String, Object>> findByTenantId(String tenantId);
+    default List<String> getExposedMethods() {
+        return Collections.emptyList();
+    }
 
-    /**
-     * Find all entities by patient UUID and tenant ID
-     */
-    List<Map<String, Object>> findByPatientUuidAndTenantId(UUID patientUuid, String tenantId);
+    // ================================================================
+    //  GENERIC CRUD
+    // ================================================================
 
-    /**
-     * Find all entities (paginated)
-     */
-    List<Map<String, Object>> findAll(String tenantId, int page, int size);
+    default Map<String, Object> save(Map<String, Object> data) {
+        throw new UnsupportedOperationException(
+                getEntityName() + " does not support generic save()");
+    }
 
-    // ============ WRITE OPERATIONS ============
+    default List<Map<String, Object>> saveAll(List<Map<String, Object>> dataList) {
+        List<Map<String, Object>> results = new ArrayList<>();
+        for (Map<String, Object> data : dataList) {
+            results.add(save(data));
+        }
+        return results;
+    }
 
-    /**
-     * Save entity (create or update)
-     * Returns saved entity as Map
-     */
-    Map<String, Object> save(Map<String, Object> data);
+    default Map<String, Object> update(UUID uuid, Map<String, Object> data) {
+        throw new UnsupportedOperationException(
+                getEntityName() + " does not support generic update()");
+    }
 
-    /**
-     * Save multiple entities
-     */
-    List<Map<String, Object>> saveAll(List<Map<String, Object>> dataList);
+    default boolean deleteByUuid(UUID uuid) {
+        return false;
+    }
 
-    /**
-     * Delete entity by UUID
-     */
-    boolean deleteByUuid(UUID uuid);
+    default Optional<Map<String, Object>> findByUuid(UUID uuid) {
+        return Optional.empty();
+    }
 
-    // ============ CUSTOM QUERY ============
+    default Optional<Object> findByObjectUuid(UUID uuid) {
+        return Optional.empty();
+    }
 
-    /**
-     * Find by custom field (flexible querying)
-     * Example: findByField("consultationUuid", someUuid)
-     */
-    List<Map<String, Object>> findByField(String fieldName, Object value);
+    default List<Map<String, Object>> findByUuids(List<UUID> uuids) {
+        return Collections.emptyList();
+    }
 
-    /**
-     * Find by multiple fields
-     * Example: findByFields(Map.of("patientUuid", uuid, "status", "ACTIVE"))
-     */
-    List<Map<String, Object>> findByFields(Map<String, Object> criteria);
+    default List<Map<String, Object>> findByPatientUuid(UUID patientUuid) {
+        return Collections.emptyList();
+    }
 
-    Optional <Object> findByObjectUuid(UUID uuid);
+    default List<Map<String, Object>> findByTenantId(String tenantId) {
+        return Collections.emptyList();
+    }
+
+    default List<Map<String, Object>> findByPatientUuidAndTenantId(UUID patientUuid, String tenantId) {
+        return Collections.emptyList();
+    }
+
+    default List<Map<String, Object>> findByField(String fieldName, Object value) {
+        return Collections.emptyList();
+    }
+
+    default List<Map<String, Object>> findByFields(Map<String, Object> criteria) {
+        return Collections.emptyList();
+    }
+
+    default List<Map<String, Object>> findAll(String tenantId, int page, int size) {
+        return Collections.emptyList();
+    }
 }
