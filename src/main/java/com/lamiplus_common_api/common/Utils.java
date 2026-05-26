@@ -60,6 +60,12 @@ public class Utils {
             log.debug("Could not access core TenantContext for facility: {}", e.getMessage());
         }
 
+        if (DevTenantContext.isSet()) {
+            UUID facilityId = DevTenantContext.getFacilityId();
+            log.debug("Facility ID from dev context: {}", facilityId);
+            return facilityId;
+        }
+
         log.debug("No facility ID in context");
         return null;
     }
