@@ -1,5 +1,8 @@
 package com.lamiplus_common_api.cache;
 
+import lombok.RequiredArgsConstructor;
+import org.springframework.boot.json.JsonParseException;
+import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.Cache;
@@ -15,33 +18,30 @@ import java.util.Optional;
  * Any module can inject this service to perform caching.
  */
 @Service
+@RequiredArgsConstructor
 public class GenericCacheService {
 
     private static final Logger log = LoggerFactory.getLogger(GenericCacheService.class);
     private final CacheManager cacheManager;
-
-    public GenericCacheService(CacheManager cacheManager) {
-        this.cacheManager = cacheManager;
-    }
+    private final ObjectMapper objectMapper;
 
     /**
-     * Retrieves a value from the specified cache.
+     * Retrieves a value from the specified cache as a JSON string.
      *
      * @param cacheName The name of the cache.
      * @param key       The key of the entry to retrieve.
-     * @param <T>       The expected type of the cached value.
-     * @return An Optional containing the value if found, otherwise an empty Optional.
+     * @return An Optional containing the value as a JSON string if found, otherwise an empty Optional.
      */
-    public <T> Optional<T> getValue(String cacheName, Object key) {
+    public Optional<String> getValue(String cacheName, Object key) throws JsonParseException {
         Cache cache = cacheManager.getCache(cacheName);
         if (cache != null) {
             Cache.ValueWrapper valueWrapper = cache.get(key);
             if (valueWrapper != null) {
-                // This is an unchecked cast. The caller is responsible for knowing
-                // the type of object they expect to retrieve from the cache.
-                @SuppressWarnings("unchecked")
-                T value = (T) valueWrapper.get();
-                return Optional.ofNullable(value);
+                Object value = valueWrapper.get();
+                if (value == null) {
+                    return Optional.empty();
+                }
+                return Optional.ofNullable(objectMapper.writeValueAsString(value));
             }
         }
         return Optional.empty();

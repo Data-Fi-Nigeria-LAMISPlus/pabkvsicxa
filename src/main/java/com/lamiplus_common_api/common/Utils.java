@@ -70,7 +70,16 @@ public class Utils {
         return null;
     }
 
-    // ============================================================
+
+    public static UUID getFacilityIdFromContext(boolean required) {
+        UUID facilityId = getFacilityIdFromContext();
+        if (facilityId == null && required) {
+            throw new IllegalStateException("Facility ID is required");
+        }
+        return facilityId;
+    }
+
+        // ============================================================
     // ADMIN ROLE CHECKS (reflection into core SecurityUtils)
     // ============================================================
 
