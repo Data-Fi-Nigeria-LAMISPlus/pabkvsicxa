@@ -199,4 +199,22 @@ class ApiErrorResolverTest {
                 List.of(new ErrorModel("CODE", "Say \"hi\"\nnow", null)), "ABC123");
         assertEquals("[{\"code\":\"CODE\",\"message\":\"Say \\\"hi\\\"\\nnow (Ref: ABC123)\",\"field\":null}]", json);
     }
+
+    @Test
+    void validationMessagesWithPropertyNamesBecomeReadable() {
+        assertEquals("Patient is required.", UserMessages.fieldMessage("patientUuid", "patientUuid is required"));
+        assertEquals("Vital sign date is required.", UserMessages.fieldMessage("vitalSignDate", "vital_sign_date is required"));
+        assertEquals("Service location is required.", UserMessages.fieldMessage("serviceLocation", "service Location is required"));
+        assertEquals("Drug is required.", UserMessages.fieldMessage("drugUuid", "drugUuid is mandatory"));
+        assertEquals("Patient is required.", UserMessages.fieldMessage("patientUuid", "Patient UUID is required"));
+        assertEquals("Max visit duration hours must be at least 1.",
+                UserMessages.fieldMessage("maxVisitDurationHours", "maxVisitDurationHours must be at least 1"));
+        // Already a proper phrase — left as written.
+        assertEquals("Date enrolled on ART cannot be in the future.",
+                UserMessages.fieldMessage("dateEnrolledOnArt", "Date enrolled on ART cannot be in the future"));
+        assertEquals("Number of kits distributed must be at least 1.",
+                UserMessages.fieldMessage("kits", "Number of kits distributed must be at least 1"));
+        // Bean Validation defaults still get the field label.
+        assertEquals("Date of birth is required.", UserMessages.fieldMessage("dateOfBirth", "must not be null"));
+    }
 }

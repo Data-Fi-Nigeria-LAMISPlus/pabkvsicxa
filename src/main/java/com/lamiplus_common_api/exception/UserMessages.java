@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -142,10 +143,7 @@ public final class UserMessages {
         if (message == null || message.isBlank()) return label + " is invalid.";
         String m = message.strip();
 
-        if (Character.isUpperCase(m.charAt(0))) {
-            return safeOr(m, label + " is invalid.");
-        }
-
+        // Bean Validation's own default templates (no subject) → full sentence with the label.
         String lower = m.toLowerCase(Locale.ROOT);
         if (lower.startsWith("must not be null") || lower.startsWith("must not be blank")
                 || lower.startsWith("must not be empty") || lower.startsWith("may not be null")
@@ -157,7 +155,43 @@ public final class UserMessages {
         if (lower.startsWith("size must be between")) {
             return finish(label + " must be " + m.substring("size must be ".length()) + " characters");
         }
+
+        // Custom messages: "patientUuid is required" → "Patient is required."
+        m = humanizeLeadingField(m);
+        if (Character.isUpperCase(m.charAt(0))) {
+            return safeOr(m, label + " is invalid.");
+        }
         return isSafe(m) ? finish(label + " " + m) : label + " is invalid.";
+    }
+
+    /** "{subject} is required", "{subject} must be at least 1", "{subject} cannot be in the future", … */
+    private static final Pattern SUBJECT_PREDICATE = Pattern.compile(
+            "^(.{1,60}?)\\s+(is (?:required|mandatory|missing|invalid)|must\\b.*|cannot\\b.*|can't\\b.*|should\\b.*)$");
+
+    /**
+     * Validation messages are often written with the property name as the subject
+     * ("patientUuid is required", "vital_sign_date is required", "service Location is required").
+     * When the subject looks like an identifier, it is replaced by its label
+     * ("Patient is required.", "Vital sign date is required."). Subjects that are already a
+     * phrase ("Date enrolled on ART cannot be in the future") are left untouched.
+     */
+    static String humanizeLeadingField(String message) {
+        Matcher m = SUBJECT_PREDICATE.matcher(message);
+        if (!m.matches()) return message;
+        String subject = m.group(1);
+        String predicate = m.group(2).replaceFirst("^is mandatory", "is required");
+        if (!looksLikeIdentifier(subject)) {
+            return predicate.equals(m.group(2)) ? message : subject + " " + predicate;
+        }
+        return label(subject) + " " + predicate;
+    }
+
+    /** camelCase, snake_case, a lowercase start, or an "id"/"uuid" suffix. */
+    private static boolean looksLikeIdentifier(String subject) {
+        if (subject.indexOf('_') >= 0) return true;
+        if (Character.isLowerCase(subject.charAt(0))) return true;
+        if (Pattern.compile("[a-z][A-Z]").matcher(subject).find()) return true;
+        return Pattern.compile("(?i)\\s(uu)?id$").matcher(subject).find();
     }
 
     /** "Please check 3 fields: Email, Date of birth and Phone number." */
